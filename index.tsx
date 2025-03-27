@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-import React, { useState } from 'react';
-import { render, Box, Text, useApp, useInput } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { render, Box, Text, useApp, useInput, useStdout } from 'ink';
 import TextInput from 'ink-text-input';
 import { nanoid } from 'nanoid';
 
@@ -12,10 +12,41 @@ interface Todo {
 
 const App = () => {
   const { exit } = useApp();
+  const { stdout } = useStdout();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inputMode, setInputMode] = useState(false);
+  const [dimensions, setDimensions] = useState({
+    columns: stdout.columns || 80,
+    rows: stdout.rows || 24
+  });
+  
+  // Handle terminal resize events
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({
+        columns: stdout.columns || 80,
+        rows: stdout.rows || 24
+      });
+    };
+    
+    // Initial size setup
+    handleResize();
+    
+    stdout.on('resize', handleResize);
+    
+    // Cleanup resize listener
+    return () => {
+      stdout.removeListener('resize', handleResize);
+    };
+  }, [stdout]);
+
+  // Clean up function to exit the app
+  const cleanExit = () => {
+    // The terminal restoration is handled in the waitUntilExit().then() callback
+    exit();
+  };
 
   // Handle keyboard input
   useInput((input, key) => {
@@ -27,7 +58,7 @@ const App = () => {
     }
 
     if (key.escape) {
-      exit();
+      cleanExit();
     } else if (key.upArrow) {
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow) {
@@ -48,7 +79,7 @@ const App = () => {
         )
       );
     } else if (input === 'q') {
-      exit();
+      cleanExit();
     }
   });
 
@@ -66,9 +97,9 @@ const App = () => {
   return (
     <Box
       flexDirection="column"
-      width="100%"
-      height="100%"
-      padding={1}
+      width={dimensions.columns}
+      height={dimensions.rows}
+      padding={0}
     >
       <Box 
         borderStyle="round" 
@@ -118,11 +149,25 @@ const App = () => {
 };
 
 // Use fullscreen option to make the app stay open and use the full terminal
-// We need to check if stdin is TTY to avoid raw mode errors
-if (process.stdin.isTTY) {
-  render(<App />, {
+// We need to check if stdout is TTY to avoid raw mode errors
+if (process.stdout.isTTY) {
+  const { waitUntilExit } = render(<App />, {
     exitOnCtrlC: false,
-    patchConsole: true
+    patchConsole: true,
+    // Enable fullscreen mode to take over the entire terminal
+    fullscreen: true
+  });
+  
+  // Handle cleanup when process is about to exit
+  process.on('SIGINT', () => {
+    process.stdout.write('\u001B[?1049l'); // Disable alternate screen buffer
+    process.stdout.write('\u001B[?25h');   // Show cursor
+  });
+  
+  waitUntilExit().then(() => {
+    // Ensure terminal is restored on exit
+    process.stdout.write('\u001B[?1049l'); // Disable alternate screen buffer
+    process.stdout.write('\u001B[?25h');   // Show cursor
   });
 } else {
   console.log('This application requires an interactive terminal to run.');
