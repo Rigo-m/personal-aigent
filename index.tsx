@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { render, Box, Text, useApp, useInput, useStdout } from 'ink';
 import TextInput from 'ink-text-input';
 import { nanoid } from 'nanoid';
@@ -9,6 +9,33 @@ interface Todo {
   text: string;
   completed: boolean;
 }
+
+// Create memoized components to reduce re-renders
+const TodoItem = memo(({ todo, isSelected }: { todo: Todo; isSelected: boolean }) => (
+  <Box>
+    <Text>
+      {isSelected ? '>' : ' '} 
+      <Text color={todo.completed ? 'green' : 'white'} strikethrough={todo.completed}>
+        {todo.text}
+      </Text>
+    </Text>
+  </Box>
+));
+
+const Header = memo(() => (
+  <Box 
+    borderStyle="round" 
+    borderColor="green" 
+    flexDirection="column"
+    width="100%"
+    padding={1}
+    marginBottom={1}
+  >
+    <Text bold color="green">Personal Aigent - Todo List</Text>
+    <Text>Press <Text color="yellow">a</Text> to add a todo, <Text color="yellow">c</Text> to toggle completion,</Text>
+    <Text><Text color="yellow">d</Text> to delete, arrow keys to navigate, <Text color="yellow">q</Text> or <Text color="yellow">ESC</Text> to quit</Text>
+  </Box>
+));
 
 const App = () => {
   const { exit } = useApp();
@@ -83,7 +110,7 @@ const App = () => {
     }
   });
 
-  const handleSubmit = (value: string) => {
+  const handleSubmit = useCallback((value: string) => {
     if (value.trim()) {
       setTodos(prev => [
         ...prev,
@@ -92,7 +119,7 @@ const App = () => {
       setInputValue('');
     }
     setInputMode(false);
-  };
+  }, []);
 
   return (
     <Box
@@ -101,18 +128,7 @@ const App = () => {
       height={dimensions.rows}
       padding={0}
     >
-      <Box 
-        borderStyle="round" 
-        borderColor="green" 
-        flexDirection="column"
-        width="100%"
-        padding={1}
-        marginBottom={1}
-      >
-        <Text bold color="green">Personal Aigent - Todo List</Text>
-        <Text>Press <Text color="yellow">a</Text> to add a todo, <Text color="yellow">c</Text> to toggle completion,</Text>
-        <Text><Text color="yellow">d</Text> to delete, arrow keys to navigate, <Text color="yellow">q</Text> or <Text color="yellow">ESC</Text> to quit</Text>
-      </Box>
+      <Header />
 
       <Box flexDirection="column" flexGrow={1} borderStyle="single" padding={1}>
         {todos.length === 0 ? (
@@ -120,14 +136,11 @@ const App = () => {
         ) : (
           <Box flexDirection="column">
             {todos.map((todo, index) => (
-              <Box key={todo.id}>
-                <Text>
-                  {index === selectedIndex ? '>' : ' '} 
-                  <Text color={todo.completed ? 'green' : 'white'} strikethrough={todo.completed}>
-                    {todo.text}
-                  </Text>
-                </Text>
-              </Box>
+              <TodoItem 
+                key={todo.id}
+                todo={todo}
+                isSelected={index === selectedIndex}
+              />
             ))}
           </Box>
         )}
@@ -151,11 +164,19 @@ const App = () => {
 // Use fullscreen option to make the app stay open and use the full terminal
 // We need to check if stdout is TTY to avoid raw mode errors
 if (process.stdout.isTTY) {
+  // Set up terminal for full-screen mode
+  process.stdout.write('\u001B[?1049h'); // Enable alternate screen buffer
+  process.stdout.write('\u001B[?25l');   // Hide cursor
+  
   const { waitUntilExit } = render(<App />, {
     exitOnCtrlC: false,
     patchConsole: true,
     // Enable fullscreen mode to take over the entire terminal
-    fullscreen: true
+    fullscreen: true,
+    // Reduce flickering by optimizing renders
+    throttleFrameRate: false,
+    // Disable debug output
+    debug: false
   });
   
   // Handle cleanup when process is about to exit
