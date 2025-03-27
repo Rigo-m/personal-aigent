@@ -9,13 +9,13 @@ if (process.stdout.isTTY) {
   process.stdout.write('\u001B[?1049h'); // Enable alternate screen buffer
   process.stdout.write('\u001B[?25l');   // Hide cursor
   
-  // Configure Ink with options to reduce flickering
+  // Configure Ink with options to balance responsiveness and flickering
   const options = {
     exitOnCtrlC: false,
     patchConsole: true,
     fullscreen: true,
-    // Setting a low frame rate can reduce flickering in some terminals
-    fps: 20
+    // Don't throttle frame rate to ensure updates are shown
+    throttleFrameRate: false
   };
   
   const { waitUntilExit } = render(<App />, options);

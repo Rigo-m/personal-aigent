@@ -9,26 +9,17 @@ interface InputFieldProps {
   onSubmit: (value: string) => void;
 }
 
-// The InputField container is static
-const InputFieldContainer = ({ children }: { children: React.ReactNode }) => (
-  <Static>
-    <Box marginTop={1} borderStyle="single" padding={1}>
-      <Text>Add Todo: </Text>
-      {children}
-    </Box>
-  </Static>
-);
-
-// The actual input field can change
-const InputField = memo(({ value, onChange, onSubmit }: InputFieldProps) => (
-  <InputFieldContainer>
+// Simplified InputField component
+const InputField = ({ value, onChange, onSubmit }: InputFieldProps) => (
+  <Box marginTop={1} borderStyle="single" padding={1}>
+    <Text>Add Todo: </Text>
     <TextInput
       value={value}
       onChange={onChange}
       onSubmit={onSubmit}
       focus={true}
     />
-  </InputFieldContainer>
-));
+  </Box>
+);
 
 export default InputField;

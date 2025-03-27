@@ -9,18 +9,9 @@ interface TodoListProps {
   selectedIndex: number;
 }
 
-// The TodoList container is static (border, etc)
-const TodoListContainer = ({ children }: { children: React.ReactNode }) => (
-  <Static>
-    <Box flexDirection="column" flexGrow={1} borderStyle="single" padding={1}>
-      {children}
-    </Box>
-  </Static>
-);
-
-// The actual list content can change
-const TodoList = memo(({ todos, selectedIndex }: TodoListProps) => (
-  <TodoListContainer>
+// The TodoList component with a static border
+const TodoList = ({ todos, selectedIndex }: TodoListProps) => (
+  <Box flexDirection="column" flexGrow={1} borderStyle="single" padding={1}>
     {todos.length === 0 ? (
       <Text dimColor>No todos yet. Press 'a' to add one.</Text>
     ) : (
@@ -34,7 +25,7 @@ const TodoList = memo(({ todos, selectedIndex }: TodoListProps) => (
         ))}
       </Box>
     )}
-  </TodoListContainer>
-));
+  </Box>
+);
 
 export default TodoList;
