@@ -10,7 +10,7 @@ interface Todo {
   completed: boolean;
 }
 
-// Create memoized components to reduce re-renders
+// Memoized TodoItem component to prevent unnecessary re-renders
 const TodoItem = memo(({ todo, isSelected }: { todo: Todo; isSelected: boolean }) => (
   <Box>
     <Text>
@@ -22,6 +22,7 @@ const TodoItem = memo(({ todo, isSelected }: { todo: Todo; isSelected: boolean }
   </Box>
 ));
 
+// Memoized Header component
 const Header = memo(() => (
   <Box 
     borderStyle="round" 
@@ -37,6 +38,39 @@ const Header = memo(() => (
   </Box>
 ));
 
+// Memoized TodoList component
+const TodoList = memo(({ todos, selectedIndex }: { todos: Todo[]; selectedIndex: number }) => (
+  <Box flexDirection="column" flexGrow={1} borderStyle="single" padding={1}>
+    {todos.length === 0 ? (
+      <Text dimColor>No todos yet. Press 'a' to add one.</Text>
+    ) : (
+      <Box flexDirection="column">
+        {todos.map((todo, index) => (
+          <TodoItem 
+            key={todo.id}
+            todo={todo}
+            isSelected={index === selectedIndex}
+          />
+        ))}
+      </Box>
+    )}
+  </Box>
+));
+
+// Memoized InputField component
+const InputField = memo(({ value, onChange, onSubmit }: { value: string; onChange: (value: string) => void; onSubmit: (value: string) => void }) => (
+  <Box marginTop={1} borderStyle="single" padding={1}>
+    <Text>Add Todo: </Text>
+    <TextInput
+      value={value}
+      onChange={onChange}
+      onSubmit={onSubmit}
+      focus={true}
+    />
+  </Box>
+));
+
+// Main App component
 const App = () => {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -44,39 +78,14 @@ const App = () => {
   const [inputValue, setInputValue] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inputMode, setInputMode] = useState(false);
-  const [dimensions, setDimensions] = useState({
-    columns: stdout.columns || 80,
-    rows: stdout.rows || 24
-  });
   
-  // Handle terminal resize events
-  useEffect(() => {
-    const handleResize = () => {
-      setDimensions({
-        columns: stdout.columns || 80,
-        rows: stdout.rows || 24
-      });
-    };
-    
-    // Initial size setup
-    handleResize();
-    
-    stdout.on('resize', handleResize);
-    
-    // Cleanup resize listener
-    return () => {
-      stdout.removeListener('resize', handleResize);
-    };
-  }, [stdout]);
-
   // Clean up function to exit the app
-  const cleanExit = () => {
-    // The terminal restoration is handled in the waitUntilExit().then() callback
+  const cleanExit = useCallback(() => {
     exit();
-  };
+  }, [exit]);
 
-  // Handle keyboard input
-  useInput((input, key) => {
+  // Handle keyboard input with useCallback to prevent recreating this function on each render
+  useInput(useCallback((input, key) => {
     if (inputMode) {
       if (key.escape) {
         setInputMode(false);
@@ -108,8 +117,9 @@ const App = () => {
     } else if (input === 'q') {
       cleanExit();
     }
-  });
+  }, [cleanExit, inputMode, selectedIndex, todos.length]));
 
+  // Handle submit with useCallback
   const handleSubmit = useCallback((value: string) => {
     if (value.trim()) {
       setTodos(prev => [
@@ -121,63 +131,48 @@ const App = () => {
     setInputMode(false);
   }, []);
 
+  // Only update input value when in input mode to reduce updates
+  const handleInputChange = useCallback((value: string) => {
+    if (inputMode) {
+      setInputValue(value);
+    }
+  }, [inputMode]);
+
   return (
     <Box
       flexDirection="column"
-      width={dimensions.columns}
-      height={dimensions.rows}
       padding={0}
     >
       <Header />
-
-      <Box flexDirection="column" flexGrow={1} borderStyle="single" padding={1}>
-        {todos.length === 0 ? (
-          <Text dimColor>No todos yet. Press 'a' to add one.</Text>
-        ) : (
-          <Box flexDirection="column">
-            {todos.map((todo, index) => (
-              <TodoItem 
-                key={todo.id}
-                todo={todo}
-                isSelected={index === selectedIndex}
-              />
-            ))}
-          </Box>
-        )}
-      </Box>
-
+      <TodoList todos={todos} selectedIndex={selectedIndex} />
       {inputMode && (
-        <Box marginTop={1} borderStyle="single" padding={1}>
-          <Text>Add Todo: </Text>
-          <TextInput
-            value={inputValue}
-            onChange={setInputValue}
-            onSubmit={handleSubmit}
-            focus={true}
-          />
-        </Box>
+        <InputField 
+          value={inputValue} 
+          onChange={handleInputChange} 
+          onSubmit={handleSubmit} 
+        />
       )}
     </Box>
   );
 };
 
-// Use fullscreen option to make the app stay open and use the full terminal
-// We need to check if stdout is TTY to avoid raw mode errors
+// Initialize the app
 if (process.stdout.isTTY) {
-  // Set up terminal for full-screen mode
+  // Set up terminal for full-screen mode before rendering
   process.stdout.write('\u001B[?1049h'); // Enable alternate screen buffer
   process.stdout.write('\u001B[?25l');   // Hide cursor
   
-  const { waitUntilExit } = render(<App />, {
+  // Configure Ink with options to reduce flickering
+  const options = {
     exitOnCtrlC: false,
     patchConsole: true,
-    // Enable fullscreen mode to take over the entire terminal
     fullscreen: true,
-    // Reduce flickering by optimizing renders
-    throttleFrameRate: false,
-    // Disable debug output
-    debug: false
-  });
+    stdout: process.stdout,
+    // Setting a low frame rate can reduce flickering in some terminals
+    fps: 30
+  };
+  
+  const { waitUntilExit } = render(<App />, options);
   
   // Handle cleanup when process is about to exit
   process.on('SIGINT', () => {
