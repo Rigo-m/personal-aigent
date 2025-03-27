@@ -1,8 +1,13 @@
 {
   "name": "personal-aigent",
   "module": "index.tsx",
+  "bin": {
+    "personal-aigent": "./index.tsx"
+  },
   "scripts": {
-    "start": "bun run index.tsx"
+    "start": "bun run index.tsx",
+    "build": "bun build index.tsx --outfile dist/personal-aigent.js",
+    "link": "bun link"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -13,7 +18,10 @@
   },
   "type": "module",
   "dependencies": {
+    "@inkjs/ui": "^2.0.0",
     "ink": "^5.2.0",
+    "ink-text-input": "^6.0.0",
+    "nanoid": "^5.1.5",
     "react": "18.2.0"
   }
 }
